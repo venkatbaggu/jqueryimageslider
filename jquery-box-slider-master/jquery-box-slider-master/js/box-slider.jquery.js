@@ -1,18 +1,19 @@
 ;(function (w, $, undefined) {
 
+  w.jqBoxSlider = w.jqBoxSlider || {};
+
   var methods = {} // external method api
     , supports3D = true // set during vendorPrefix determination
     , slideAnimators = {} // map of animation effect objects
     , defaults = { // default required settings
         speed: 800
+      , responsive: true
       , timeout: 5000
       , autoScroll: false
       , pauseOnHover: false
       , effect: 'scrollVert3d'
       , perspective: 1000
     };
-
-  w.jqBoxSlider = methods; // Global alias for easy extension
 
   // API methods ---------------------------------------------------------------
 
@@ -23,12 +24,13 @@
 
     return this.each(function () {
       var $this = $(this)
-        , $slides = $this.children()
-        , settings = $.extend({}, defaultSettings);
+        , settings = $.extend({}, defaultSettings)
+        , $slides = $this.children();
 
       $this.data('bssettings', settings);
       settings.slideAnimator = animator;
       settings.slideAnimator.initialize($this, $slides, settings);
+      $slides.eq(settings.bsfaceindex || 0).addClass('jbs-current');
       setupControls($this, settings);
 
       if (settings.autoScroll) {
@@ -39,6 +41,10 @@
         if (settings.pauseOnHover) {
           $this.on('hover', togglePlayPause);
         }
+      }
+
+      if (settings.responsive && jqBoxSlider.responder) {
+        jqBoxSlider.responder.watch($this);
       }
     });
   };
@@ -60,21 +66,21 @@
       showNextSlide($box, index);
     });
   };
-  
+
   // moves the slider to the next slide
   methods.next = function () {
     return this.each(function () {
       var $box = $(this);
-      
+
       showNextSlide($box);
     });
   };
-  
+
   // moves the slider to the previous slide
   methods.prev = function () {
     return this.each(function () {
       var $box = $(this);
-      
+
       showNextSlide($box, null, true);
     });
   };
@@ -97,6 +103,7 @@
     if (typeof slideAnimators[effect] === 'object') {
       return slideAnimators[effect];
     }
+
     throw new Error(
       'The slide animator for the ' + effect +
       ' effect has not been registered'
@@ -109,24 +116,20 @@
       return (this.data('bssettings') || {})[setting];
     }
 
+    if (setting === 'effect') {
+      throw new Error('Effect can only be set during plugin initialisation');
+    }
+
     return this.each(function (i, el) {
       var $box = $(this)
-        , settings = $box.data('bssettings') || {};
+        , settings = $box.data('bssettings') || {}
+        , $slides = filterSlides($box.children(), settings);
 
       settings[setting] = newValue;
       resetAutoScroll($box, settings);
 
-      if (setting === 'effect') {
-        settings.slideAnimator.destroy($box, settings);
-        settings.slideAnimator = methods.slideAnimator(newValue);
-        settings._slideFilter = null;
-        settings.bsfaceindex = 0;
-        settings.slideAnimator.initialize($box, $box.children(), settings);
-        return;
-      }
-
       if (typeof settings.slideAnimator.reset === 'function') {
-        settings.slideAnimator.reset($box, settings);
+        settings.slideAnimator.reset($box, $slides, settings);
       }
     });
   };
@@ -139,14 +142,39 @@
         , settings = data.bssettings;
 
       if (settings && typeof settings.slideAnimator === 'object') {
-        if (settings.autointv) {
-          clearInterval(settings.autointv);
-        }
-        // ----------------------------------------------------------- TODO unbind control event listeners
+        clearInterval(settings.autointv);
         settings.slideAnimator.destroy($box, settings);
+        tearDownControls(settings);
+        $box
+          .removeData('bssettings')
+          .removeClass('jbs-in-motion')
+          .find('.jbs-current')
+          .removeClass('jbs-current');
       }
     });
   };
+
+  // Called on window resize if the responder is being used
+  methods.resize = function ($sliders) {
+    return $.each($sliders || this, function (i, slider) {
+      var $slider = $(slider)
+        , settings = $slider.data('bssettings');
+
+      if ( // Call resize method on animator if it exists
+        settings &&
+        settings.slideAnimator &&
+        $.isFunction(settings.slideAnimator.resize)
+      ) {
+        settings.slideAnimator.resize(
+            $slider
+          , filterSlides($slider, settings)
+          , settings
+        );
+      }
+    });
+  };
+
+  $.extend(jqBoxSlider, methods);
 
   // Event listeners and controls ----------------------------------------------
 
@@ -175,6 +203,17 @@
     $controls.data('bsbox', $box);
   };
 
+  var tearDownControls = function (settings) {
+    $(
+      settings.next,
+      settings.prev,
+      settings.pause
+    )
+    .off('click', nextSlideListener)
+    .off('click', playPauseListener)
+    .removeData('bsbox');
+  };
+
   // event listener for a next button
   var nextSlideListener = function (ev) {
     var $box = $(this).data('bsbox');
@@ -199,7 +238,7 @@
     var $box = $(this)
       , playing;
 
-    settings || (settings = $box.data('bssettings'));
+    settings = settings || $box.data('bssettings');
     playing = settings.autointv != null;
 
     if (typeof settings.onplaypause === 'function') {
@@ -219,23 +258,11 @@
   // moves the slider to the next or previous slide
   var showNextSlide = function ($box, index, reverse) {
     var settings = $box.data('bssettings')
-      , $slides = $box.children()
+      , $slides = filterSlides($box, settings)
       , currIndex
       , nextIndex
       , $currSlide
       , $nextSlide;
-
-    // apply slide filter so we only have the content slides
-    if (settings._slideFilter != null) {
-      if (typeof settings._slideFilter === 'function') {
-        $slides = $slides.filter(function (index) {
-          return settings._slideFilter.call($slides, index, settings);
-        });
-      }
-      else {
-        $slides = $slides.filter(settings.slideFilter);
-      }
-    }
 
     currIndex = settings.bsfaceindex || 0;
     nextIndex = calculateIndex(currIndex, $slides.length, reverse, index);
@@ -267,6 +294,9 @@
     setTimeout( // remove the active flag class once transition is complete
         function () {
           $box.removeClass('jbs-in-motion');
+          $currSlide.removeClass('jbs-current');
+          $nextSlide.addClass('jbs-current');
+
           if (typeof settings.onafter === 'function') {
             settings.onafter.call($box, $currSlide, $nextSlide, currIndex, nextIndex);
           }
@@ -276,6 +306,24 @@
 
     // cache settings for next transition
     settings.bsfaceindex = nextIndex;
+  };
+
+  var filterSlides = function ($box, settings) {
+    var $slides = $box.children();
+
+    // User defined slide filter
+    if (typeof settings.slideFilter === 'function') {
+      $slides = $slides.filter(settings.slideFilter);
+    }
+
+    // Effect defined filter
+    if (typeof settings._slideFilter === 'function') {
+      $slides = $slides.filter(function (index) {
+        return settings._slideFilter.call($slides, index, settings);
+      });
+    }
+
+    return $slides;
   };
 
   // if the box is autoscrolling it is reset
@@ -312,15 +360,17 @@
   // caches the desired css for reapplying the original styling when
   // the plugin is destroyed or reset
   var cacheCSS = function ($el, name, settings, extraAtts) {
-    var attributes = [
-      'position',   'top',    'left',   'display',  'overflow',
-      'width',      'height'
-    ].concat(extraAtts || []);
+    var el = $el.get(0)
+      , attributes = [
+          'position',   'top',    'left',   'display',  'overflow',
+          'width',      'height', 'zIndex'
+        ].concat(extraAtts || []);
+
     settings.origCSS || (settings.origCSS = {});
     settings.origCSS[name] || (settings.origCSS[name] = {});
 
     $.each(attributes, function (i, att) {
-      settings.origCSS[name][att] = $el.css(att);
+      settings.origCSS[name][att] = el.style[att];
     });
   };
 

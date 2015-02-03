@@ -190,6 +190,7 @@
     <Content Include="js\box-slider-all.jquery.min.js" />
     <Content Include="js\box-slider-blinds.jquery.min.js" />
     <Content Include="js\box-slider-fade.jquery.min.js" />
+    <Content Include="js\box-slider-responder.jquery.js" />
     <Content Include="js\box-slider-scroll-3d.jquery.min.js" />
     <Content Include="js\box-slider-scroll.jquery.min.js" />
     <Content Include="js\box-slider-tile.jquery.min.js" />
@@ -275,7 +276,7 @@
           <AutoAssignPort>True</AutoAssignPort>
           <DevelopmentServerPort>50444</DevelopmentServerPort>
           <DevelopmentServerVPath>/</DevelopmentServerVPath>
-          <IISUrl>http://localhost:50444/</IISUrl>
+          <IISUrl>http://localhost:60444/</IISUrl>
           <NTLMAuthentication>False</NTLMAuthentication>
           <UseCustomServer>False</UseCustomServer>
           <CustomServerUrl>

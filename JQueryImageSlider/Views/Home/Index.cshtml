@@ -5,47 +5,36 @@
 
 
 
-<div class="row">
+<div id="page" class="row">
     <section>
-        <header>
-            <hgroup>
-                <h1>Adaptor</h1>
-                <h2>jQuery content slider</h2>
-            </hgroup>
-        </header>
-        <div id="viewport-shadow">
-            <a href="#" id="prev" title="go to the next slide"></a>
-            <a href="#" id="next" title="go to the next slide"></a>
-            <div id="viewport">
-                <div id="box">
-                    @*Bind images here*@
-                    @foreach (var item in Model)
-                    {
-                        <figure class="slide">
-                            <img src=@item.ImagePath>
-                        </figure>
-                    }
+        
 
-
-                </div>
+        <div id="viewport">
+            <div id="box">
+                @*Bind images here*@
+                @foreach (var item in Model)
+                {
+                    <figure class="slide">
+                        <img src=@item.ImagePath class="img-responsive">
+                        <figcaption>Static Caption</figcaption>
+                    </figure>
+                }
             </div>
-            <div id="time-indicator"></div>
         </div>
-
-        @* here we are binding the slider controls navigation *@
         <footer>
             <nav class="slider-controls">
+                <a class="increment-control" href="#" id="prev" title="go to the next slide">&laquo; Prev</a>
+                <a class="increment-control" href="#" id="next" title="go to the next slide">Next &raquo;</a>
                 <ul id="controls">
                     @{int index = 0;}
                     @foreach (var item in Model)
                     {
-                        
-                         string cssClass = index.Equals(0) ? "goto-slide current" : "goto-slide";
 
-                         <li><a class="@cssClass" href=" #" data-slideindex="@index"></a></li>
-                         index= index +1;
+                        string cssClass = index.Equals(0) ? "goto-slide current" : "goto-slide";
+
+                        <li><a class="@cssClass" href=" #" data-slideindex="@index"></a></li>
+                        index = index + 1;
                     }
-                  
                 </ul>
             </nav>
         </footer>
@@ -71,19 +60,6 @@
     <script type="text/javascript">
 
         $(function () {
-
-            var $box = $('#box')
-              , $indicators = $('.goto-slide')
-              , $effects = $('.effect')
-              , $timeIndicator = $('#time-indicator')
-              , slideInterval = 5000
-              , effectOptions = {
-                  'blindLeft': { blindCount: 15 }
-                , 'blindDown': { blindCount: 15 }
-                , 'tile3d': { tileRows: 6, rowOffset: 80 }
-                , 'tile': { tileRows: 6, rowOffset: 80 }
-              };
-
             // This function runs before the slide transition starts
             var switchIndicator = function ($c, $n, currIndex, nextIndex) {
                 // kills the timeline by setting it's width to zero
@@ -95,23 +71,35 @@
             // This function runs after the slide transition finishes
             var startTimeIndicator = function () {
                 // start the timeline animation
-                $timeIndicator.animate({ width: '680px' }, slideInterval);
+                $timeIndicator.animate({ width: '100%' }, slideInterval);
             };
 
-            // initialize the plugin with the desired settings
-            $box.boxSlider({
-                speed: 1000
-              , autoScroll: true
-              , timeout: slideInterval
-              , next: '#next'
-              , prev: '#prev'
-              , pause: '#pause'
-              , effect: 'scrollVert3d'
-              , onbefore: switchIndicator
-              , onafter: startTimeIndicator
-            });
+            var $box = $('#box')
+              , $indicators = $('.goto-slide')
+              , $effects = $('.effect')
+              , $timeIndicator = $('#time-indicator')
+              , slideInterval = 5000
+              , defaultOptions = {
+                  speed: 1200
+                  , autoScroll: true
+                  , timeout: slideInterval
+                  , next: '#next'
+                  , prev: '#prev'
+                  , pause: '#pause'
+                  , onbefore: switchIndicator
+                  , onafter: startTimeIndicator
+              }
+              , effectOptions = {
+                  'blindLeft': { blindCount: 15 }
+                , 'blindDown': { blindCount: 15 }
+                , 'tile3d': { tileRows: 6, rowOffset: 80 }
+                , 'tile': { tileRows: 6, rowOffset: 80 }
+              };
 
-            startTimeIndicator(); // start the time line for the first slide
+            // initialize the plugin with the desired settings
+            $box.boxSlider(defaultOptions);
+            // start the time line for the first slide
+            startTimeIndicator();
 
             // Paginate the slides using the indicator controls
             $('#controls').on('click', '.goto-slide', function (ev) {
@@ -120,7 +108,7 @@
             });
 
             // This is for demo purposes only, kills the plugin and resets it with
-            // the newly selected effect FIXME clean this up!
+            // the newly selected effect
             $('#effect-list').on('click', '.effect', function (ev) {
                 var $effect = $(this)
                   , fx = $effect.data('fx')
@@ -129,18 +117,13 @@
                 $effects.removeClass('current');
                 $effect.addClass('current');
                 switchIndicator(null, null, 0, 0);
-
-                if (extraOptions) {
-                    $.each(extraOptions, function (opt, val) {
-                        $box.boxSlider('option', opt, val);
-                    });
-                }
-
-                $box.boxSlider('option', 'effect', $effect.data('fx'));
+                $box
+                  .boxSlider('destroy')
+                  .boxSlider($.extend({ effect: fx }, defaultOptions, extraOptions));
+                startTimeIndicator();
 
                 ev.preventDefault();
             });
-
         });
 
     </script>
